@@ -25,10 +25,7 @@ class RqsConfig {
   final String downloadDir;
   final bool debug;
 
-  const RqsConfig({
-    required this.downloadDir,
-    this.debug = false,
-  });
+  const RqsConfig({required this.downloadDir, this.debug = false});
 }
 
 class RqsService {
@@ -124,8 +121,8 @@ class RqsService {
   }
 
   void _handleConnection(Socket socket) {
-    final remote = socket.remoteAddress?.address ?? 'unknown';
-    final port = socket.remotePort?.toString() ?? '0';
+    final remote = socket.remoteAddress.address;
+    final port = socket.remotePort.toString();
     final id = '$remote:$port';
     final connection = _ConnectionState(id: id, socket: socket);
     _connections[id] = connection;
@@ -193,7 +190,8 @@ class RqsService {
     final bytes = buffer.toBytes();
     var offset = 0;
     while (offset + 4 <= bytes.length) {
-      final length = (bytes[offset] << 24) |
+      final length =
+          (bytes[offset] << 24) |
           (bytes[offset + 1] << 16) |
           (bytes[offset + 2] << 8) |
           bytes[offset + 3];
@@ -224,7 +222,10 @@ class RqsService {
     connection?.socket.close();
   }
 
-  Future<void> _handleFrame(_ConnectionState connection, Uint8List frame) async {
+  Future<void> _handleFrame(
+    _ConnectionState connection,
+    Uint8List frame,
+  ) async {
     if (connection.stage == _HandshakeStage.awaitingClientInit ||
         connection.stage == _HandshakeStage.awaitingClientFinish) {
       if (await _handleUkey2Message(connection, frame)) {
@@ -289,15 +290,12 @@ class RqsService {
       return;
     }
     try {
-      final info =
-          parseEndpointInfoBytes(Uint8List.fromList(request.endpointInfo));
+      final info = parseEndpointInfoBytes(
+        Uint8List.fromList(request.endpointInfo),
+      );
       final existing = _active[connection.id];
       if (existing != null) {
-        _emit(
-          existing.copyWith(
-            sourceName: info.name,
-          ),
-        );
+        _emit(existing.copyWith(sourceName: info.name));
       }
       connection.stage = _HandshakeStage.awaitingClientInit;
       _log('Handshake -> awaitingClientInit for ${connection.id}');
@@ -338,7 +336,9 @@ class RqsService {
       return;
     }
     connection.sentResponse = true;
-    _log('Sending ConnectionResponse ${accept ? "ACCEPT" : "REJECT"} to ${connection.id}');
+    _log(
+      'Sending ConnectionResponse ${accept ? "ACCEPT" : "REJECT"} to ${connection.id}',
+    );
     final response = lnc.OfflineFrame(
       version: lnc.OfflineFrame_Version.V1,
       v1: lnc.V1Frame(
@@ -400,13 +400,11 @@ class RqsService {
       final cipherText = headerAndBody.body;
 
       final aes = AesCbc.with256bits(macAlgorithm: MacAlgorithm.empty);
-      final secretBox = SecretBox(
-        cipherText,
-        nonce: iv,
-        mac: Mac.empty,
+      final secretBox = SecretBox(cipherText, nonce: iv, mac: Mac.empty);
+      final clearText = await aes.decrypt(
+        secretBox,
+        secretKey: SecretKey(connection.decryptKey!),
       );
-      final clearText =
-          await aes.decrypt(secretBox, secretKey: SecretKey(connection.decryptKey!));
 
       final d2dMsg = d2d.DeviceToDeviceMessage.fromBuffer(clearText);
       _log(
@@ -416,14 +414,11 @@ class RqsService {
       final expected = connection.expectedClientSeq;
       final seq = d2dMsg.sequenceNumber;
       if (seq != expected) {
-        _log('D2D seq mismatch ${seq} != ${expected} for ${connection.id}');
+        _log('D2D seq mismatch $seq != $expected for ${connection.id}');
         return;
       }
       final offline = lnc.OfflineFrame.fromBuffer(d2dMsg.message);
       final v1 = offline.v1;
-      if (v1 == null) {
-        return;
-      }
       _log('SecureMessage offline ${v1.type.name} from ${connection.id}');
       if (v1.type == lnc.V1Frame_FrameType.PAYLOAD_TRANSFER &&
           v1.hasPayloadTransfer()) {
@@ -492,7 +487,8 @@ class RqsService {
 
   Future<void> _handlePairedKeyEncryption(_ConnectionState connection) async {
     if (connection.sharingStage != _SharingStage.sentConnectionResponse &&
-        connection.sharingStage != _SharingStage.waitingForPairedKeyEncryption) {
+        connection.sharingStage !=
+            _SharingStage.waitingForPairedKeyEncryption) {
       return;
     }
 
@@ -603,7 +599,9 @@ class RqsService {
     sn.Frame frame,
   ) async {
     if (connection.encryptKey == null || connection.sendHmacKey == null) {
-      _log('Encrypted sharing frame skipped (keys missing) for ${connection.id}');
+      _log(
+        'Encrypted sharing frame skipped (keys missing) for ${connection.id}',
+      );
       return;
     }
     final data = frame.writeToBuffer();
@@ -725,10 +723,7 @@ class RqsService {
     final existing = _active[connection.id];
     if (existing != null) {
       _emit(
-        existing.copyWith(
-          state: 'Finished',
-          ackBytes: existing.totalBytes,
-        ),
+        existing.copyWith(state: 'Finished', ackBytes: existing.totalBytes),
       );
     }
     await _sendDisconnection(connection);
@@ -762,15 +757,10 @@ class RqsService {
           lnc.PayloadTransferFrame_PayloadHeader_PayloadType.BYTES) {
         currentId = header.id.toInt();
         final bytesId = currentId;
-        if (bytesId != null) {
-          connection.bytesPayloads.putIfAbsent(
-            bytesId,
-            () => _BytesPayload(
-              id: bytesId,
-              totalSize: header.totalSize.toInt(),
-            ),
-          );
-        }
+        connection.bytesPayloads.putIfAbsent(
+          bytesId,
+          () => _BytesPayload(id: bytesId, totalSize: header.totalSize.toInt()),
+        );
         _log('Payload header BYTES id=$currentId size=${header.totalSize}');
       }
     }
@@ -828,8 +818,7 @@ class RqsService {
     _ConnectionState connection,
     lnc.PayloadTransferFrame_PayloadChunk chunk, {
     int? payloadId,
-  }
-  ) async {
+  }) async {
     final id = payloadId ?? _lastPayloadId(connection);
     if (id == null) {
       _log('Payload chunk without id for ${connection.id}');
@@ -838,14 +827,18 @@ class RqsService {
     final info = connection.files[id];
     final bytesPayload = connection.bytesPayloads[id];
     if (info == null && bytesPayload == null) {
-      _log('Payload chunk for unknown id=$id offset=${chunk.offset} len=${chunk.body.length}');
+      _log(
+        'Payload chunk for unknown id=$id offset=${chunk.offset} len=${chunk.body.length}',
+      );
       return;
     }
 
     final offset = chunk.offset.toInt();
     if (info != null) {
       if (offset != info.bytesTransferred) {
-        _log('File chunk offset mismatch id=$id offset=$offset expected=${info.bytesTransferred}');
+        _log(
+          'File chunk offset mismatch id=$id offset=$offset expected=${info.bytesTransferred}',
+        );
         return;
       }
       if (chunk.body.isNotEmpty) {
@@ -896,7 +889,9 @@ class RqsService {
           _log('Bytes payload complete id=$id size=${data.length}');
           await _handleSharingNearbyBytes(connection, data);
         } else {
-          _log('Bytes payload size mismatch id=$id size=${data.length} expected=${bytesPayload.totalSize}');
+          _log(
+            'Bytes payload size mismatch id=$id size=${data.length} expected=${bytesPayload.totalSize}',
+          );
         }
       }
     }
@@ -907,11 +902,7 @@ class RqsService {
     if (existing == null) {
       return;
     }
-    _emit(
-      existing.copyWith(
-        ackBytes: existing.ackBytes + delta,
-      ),
-    );
+    _emit(existing.copyWith(ackBytes: existing.ackBytes + delta));
   }
 
   int? _lastPayloadId(_ConnectionState connection) {
@@ -988,7 +979,9 @@ class RqsService {
         case ukey.Ukey2Message_Type.ALERT:
           try {
             final alert = ukey.Ukey2Alert.fromBuffer(msg.messageData);
-            _log('UKEY2 ALERT type=${alert.type.name} msg=${alert.errorMessage}');
+            _log(
+              'UKEY2 ALERT type=${alert.type.name} msg=${alert.errorMessage}',
+            );
           } catch (_) {
             _log('UKEY2 ALERT (failed to decode) from ${connection.id}');
           }
@@ -1010,11 +1003,16 @@ class RqsService {
   ) async {
     try {
       if (connection.stage != _HandshakeStage.awaitingClientInit) {
-        await _sendUkeyAlert(connection, ukey.Ukey2Alert_AlertType.BAD_MESSAGE_TYPE);
+        await _sendUkeyAlert(
+          connection,
+          ukey.Ukey2Alert_AlertType.BAD_MESSAGE_TYPE,
+        );
         return;
       }
       final clientInit = ukey.Ukey2ClientInit.fromBuffer(msg.messageData);
-      _log('UKEY2 ClientInit v=${clientInit.version} rand=${clientInit.random.length} next=${clientInit.nextProtocol}');
+      _log(
+        'UKEY2 ClientInit v=${clientInit.version} rand=${clientInit.random.length} next=${clientInit.nextProtocol}',
+      );
       if (clientInit.version != 1) {
         await _sendUkeyAlert(connection, ukey.Ukey2Alert_AlertType.BAD_VERSION);
         return;
@@ -1028,24 +1026,34 @@ class RqsService {
       for (final commitment in clientInit.cipherCommitments) {
         if (commitment.handshakeCipher ==
             ukey.Ukey2HandshakeCipher.P256_SHA512) {
-          connection.cipherCommitment = Uint8List.fromList(commitment.commitment);
+          connection.cipherCommitment = Uint8List.fromList(
+            commitment.commitment,
+          );
           found = true;
           break;
         }
       }
       if (!found) {
         _log('UKEY2 missing P256_SHA512');
-        await _sendUkeyAlert(connection, ukey.Ukey2Alert_AlertType.BAD_HANDSHAKE_CIPHER);
+        await _sendUkeyAlert(
+          connection,
+          ukey.Ukey2Alert_AlertType.BAD_HANDSHAKE_CIPHER,
+        );
         return;
       }
       if (clientInit.nextProtocol != 'AES_256_CBC-HMAC_SHA256') {
         _log('UKEY2 bad nextProtocol ${clientInit.nextProtocol}');
-        await _sendUkeyAlert(connection, ukey.Ukey2Alert_AlertType.BAD_NEXT_PROTOCOL);
+        await _sendUkeyAlert(
+          connection,
+          ukey.Ukey2Alert_AlertType.BAD_NEXT_PROTOCOL,
+        );
         return;
       }
 
       final keyPair = await NearbyCrypto.newKeyPair();
-      _log('UKEY2 pubkey x=${keyPair.publicX.length} y=${keyPair.publicY.length}');
+      _log(
+        'UKEY2 pubkey x=${keyPair.publicX.length} y=${keyPair.publicY.length}',
+      );
       final pkey = sm.GenericPublicKey(
         type: sm.PublicKeyType.EC_P256,
         ecP256PublicKey: sm.EcP256PublicKey(
@@ -1088,7 +1096,10 @@ class RqsService {
     Uint8List rawMsg,
   ) async {
     if (connection.stage != _HandshakeStage.awaitingClientFinish) {
-      await _sendUkeyAlert(connection, ukey.Ukey2Alert_AlertType.BAD_MESSAGE_TYPE);
+      await _sendUkeyAlert(
+        connection,
+        ukey.Ukey2Alert_AlertType.BAD_MESSAGE_TYPE,
+      );
       return;
     }
     final commitment = connection.cipherCommitment;
@@ -1096,19 +1107,28 @@ class RqsService {
       final hash = await Sha512().hash(rawMsg);
       if (!_constantTimeEquals(commitment, hash.bytes)) {
         _log('UKEY2 commitment mismatch for ${connection.id}');
-        await _sendUkeyAlert(connection, ukey.Ukey2Alert_AlertType.BAD_MESSAGE_DATA);
+        await _sendUkeyAlert(
+          connection,
+          ukey.Ukey2Alert_AlertType.BAD_MESSAGE_DATA,
+        );
         return;
       }
     }
     final clientFinish = ukey.Ukey2ClientFinished.fromBuffer(msg.messageData);
     _log('UKEY2 ClientFinish received');
     if (clientFinish.publicKey.isEmpty) {
-      await _sendUkeyAlert(connection, ukey.Ukey2Alert_AlertType.BAD_MESSAGE_DATA);
+      await _sendUkeyAlert(
+        connection,
+        ukey.Ukey2Alert_AlertType.BAD_MESSAGE_DATA,
+      );
       return;
     }
     final peerKey = sm.GenericPublicKey.fromBuffer(clientFinish.publicKey);
     if (!peerKey.hasEcP256PublicKey()) {
-      await _sendUkeyAlert(connection, ukey.Ukey2Alert_AlertType.BAD_MESSAGE_DATA);
+      await _sendUkeyAlert(
+        connection,
+        ukey.Ukey2Alert_AlertType.BAD_MESSAGE_DATA,
+      );
       return;
     }
     await _finalizeKeyExchange(connection, peerKey);
@@ -1129,8 +1149,11 @@ class RqsService {
       return;
     }
 
-    final sharedSecret =
-        await NearbyCrypto.sharedSecret(keyPair: keyPair, remoteX: x, remoteY: y);
+    final sharedSecret = await NearbyCrypto.sharedSecret(
+      keyPair: keyPair,
+      remoteX: x,
+      remoteY: y,
+    );
     final derivedSecret = await NearbyCrypto.sha256(sharedSecret);
 
     final ukeyInfo = BytesBuilder()
@@ -1276,10 +1299,7 @@ class _BytesPayload {
   final int totalSize;
   final BytesBuilder buffer = BytesBuilder(copy: false);
 
-  _BytesPayload({
-    required this.id,
-    required this.totalSize,
-  });
+  _BytesPayload({required this.id, required this.totalSize});
 }
 
 enum _HandshakeStage {
