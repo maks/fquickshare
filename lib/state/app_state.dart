@@ -12,14 +12,17 @@ class AppState extends ChangeNotifier {
   bool _autoAccept = false;
   bool _running = false;
 
-  AppState()
-      : _service = RqsService(
-          RqsConfig(
-            downloadDir: _resolveDownloadDir(),
-            debug: _resolveDebug(),
-          ),
-        ) {
-    _init();
+  AppState({RqsService? service, bool autoStart = true})
+      : _service = service ??
+            RqsService(
+              RqsConfig(
+                downloadDir: _resolveDownloadDir(),
+                debug: _resolveDebug(),
+              ),
+            ) {
+    if (autoStart) {
+      _init();
+    }
   }
 
   List<UiEvent> get events => List.unmodifiable(_events);
