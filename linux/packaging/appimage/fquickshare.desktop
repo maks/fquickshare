@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=FQuickShare
+Exec=fquickshare
+Icon=fquickshare
+Categories=Utility;
+Terminal=false
