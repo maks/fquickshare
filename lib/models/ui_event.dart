@@ -8,6 +8,7 @@ class UiEvent {
   final int ackBytes;
   final String? pinCode;
   final String? destination;
+  final String? url;
   final int timestampMs;
 
   const UiEvent({
@@ -20,6 +21,7 @@ class UiEvent {
     this.ackBytes = 0,
     this.pinCode,
     this.destination,
+    this.url,
     this.timestampMs = 0,
   });
 
@@ -36,6 +38,7 @@ class UiEvent {
       ackBytes: (json['ackBytes'] as num?)?.toInt() ?? 0,
       pinCode: json['pinCode'] as String?,
       destination: json['destination'] as String?,
+      url: json['url'] as String?,
       timestampMs: (json['timestampMs'] as num?)?.toInt() ?? 0,
     );
   }
@@ -52,6 +55,7 @@ class UiEvent {
     int? ackBytes,
     String? pinCode,
     String? destination,
+    String? url,
     int? timestampMs,
   }) {
     return UiEvent(
@@ -64,6 +68,7 @@ class UiEvent {
       ackBytes: ackBytes ?? this.ackBytes,
       pinCode: pinCode ?? this.pinCode,
       destination: destination ?? this.destination,
+      url: url ?? this.url,
       timestampMs: timestampMs ?? this.timestampMs,
     );
   }
