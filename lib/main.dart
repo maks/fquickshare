@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'state/app_state.dart';
 
@@ -103,6 +104,31 @@ class HomeScreen extends StatelessWidget {
                                       'Files: ${event.files.join(', ')}',
                                     ),
                                     const SizedBox(height: 6),
+                                  ],
+                                  if (event.url != null) ...[
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            event.url!,
+                                            style: const TextStyle(
+                                              color: Colors.blue,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () {
+                                            final uri = Uri.tryParse(event.url!);
+                                            if (uri != null) {
+                                              launchUrl(uri);
+                                            }
+                                          },
+                                          child: const Text('Open'),
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                   if (event.destination != null)
                                     Text('Destination: ${event.destination}'),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
 import 'dart:math';
@@ -547,6 +548,7 @@ class RqsService {
         );
       }
       connection.textPayloadId = meta.payloadId.toInt();
+      connection.textType = meta.type.name;
       await _sendSharingResponse(
         connection,
         sn.ConnectionResponseFrame_Status.ACCEPT,
@@ -729,6 +731,28 @@ class RqsService {
     await _sendDisconnection(connection);
   }
 
+  Future<void> _handleTextContent(
+    _ConnectionState connection,
+    Uint8List data,
+  ) async {
+    final text = utf8.decode(data, allowMalformed: true).trim();
+    _log('Text content received type=${connection.textType}: "$text"');
+    final existing = _active[connection.id];
+    if (existing != null) {
+      final isUrl = connection.textType == 'URL';
+      _emit(
+        existing.copyWith(
+          state: 'Finished',
+          url: isUrl ? text : null,
+          ackBytes: existing.totalBytes > 0 ? existing.totalBytes : data.length,
+          totalBytes: existing.totalBytes > 0 ? existing.totalBytes : data.length,
+        ),
+      );
+    }
+    connection.finished = true;
+    await _sendDisconnection(connection);
+  }
+
   int _randomPayloadId() {
     final rng = Random.secure();
     final hi = rng.nextInt(1 << 30);
@@ -749,10 +773,21 @@ class RqsService {
       final header = frame.payloadHeader;
       if (header.type ==
           lnc.PayloadTransferFrame_PayloadHeader_PayloadType.FILE) {
-        await _registerFileTransfer(connection, header);
         currentId = header.id.toInt();
         connection.lastPayloadId = currentId;
-        _log('Payload header FILE id=$currentId size=${header.totalSize}');
+        if (currentId == connection.textPayloadId) {
+          connection.bytesPayloads.putIfAbsent(
+            currentId,
+            () => _BytesPayload(
+              id: currentId!,
+              totalSize: header.totalSize.toInt(),
+            ),
+          );
+          _log('Payload header TEXT id=$currentId size=${header.totalSize}');
+        } else {
+          await _registerFileTransfer(connection, header);
+          _log('Payload header FILE id=$currentId size=${header.totalSize}');
+        }
       } else if (header.type ==
           lnc.PayloadTransferFrame_PayloadHeader_PayloadType.BYTES) {
         currentId = header.id.toInt();
@@ -886,8 +921,13 @@ class RqsService {
         final data = bytesPayload.buffer.toBytes();
         connection.bytesPayloads.remove(id);
         if (data.length == bytesPayload.totalSize) {
-          _log('Bytes payload complete id=$id size=${data.length}');
-          await _handleSharingNearbyBytes(connection, data);
+          if (id == connection.textPayloadId) {
+            _log('Text payload complete id=$id size=${data.length}');
+            await _handleTextContent(connection, data);
+          } else {
+            _log('Bytes payload complete id=$id size=${data.length}');
+            await _handleSharingNearbyBytes(connection, data);
+          }
         } else {
           _log(
             'Bytes payload size mismatch id=$id size=${data.length} expected=${bytesPayload.totalSize}',
@@ -1264,6 +1304,7 @@ class _ConnectionState {
   int? lastPayloadId;
   final Map<int, String> pendingPayloads = {};
   int? textPayloadId;
+  String? textType;
   final Map<int, _BytesPayload> bytesPayloads = {};
   _SharingStage sharingStage = _SharingStage.waitingForPairedKeyEncryption;
   bool finished = false;
