@@ -5,18 +5,18 @@ import 'package:url_launcher/url_launcher.dart';
 import 'state/app_state.dart';
 
 void main() {
-  runApp(const RquickshareApp());
+  runApp(const FquickshareApp());
 }
 
-class RquickshareApp extends StatelessWidget {
-  const RquickshareApp({super.key});
+class FquickshareApp extends StatelessWidget {
+  const FquickshareApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => AppState(),
       child: MaterialApp(
-        title: 'RQuickShare',
+        title: 'FQuickShare',
         theme: ThemeData(useMaterial3: true),
         home: const HomeScreen(),
       ),
@@ -30,9 +30,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('RQuickShare'),
-      ),
+      appBar: AppBar(title: const Text('FQuickShare')),
       body: Consumer<AppState>(
         builder: (context, state, _) {
           return Column(
@@ -62,9 +60,7 @@ class HomeScreen extends StatelessWidget {
               ),
               Expanded(
                 child: state.events.isEmpty
-                    ? const Center(
-                        child: Text('Waiting for transfers...'),
-                      )
+                    ? const Center(child: Text('Waiting for transfers...'))
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         itemCount: state.events.length,
@@ -82,27 +78,26 @@ class HomeScreen extends StatelessWidget {
                                       Expanded(
                                         child: Text(
                                           event.sourceName ?? 'Unknown device',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleMedium,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.titleMedium,
                                         ),
                                       ),
                                       Text(
                                         event.state ?? 'Unknown',
                                         style: event.state == 'Finished'
-                                            ? Theme.of(context)
-                                                .textTheme
-                                                .titleMedium
-                                                ?.copyWith(fontWeight: FontWeight.w600)
+                                            ? Theme.of(
+                                                context,
+                                              ).textTheme.titleMedium?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                              )
                                             : null,
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 8),
                                   if (event.files.isNotEmpty) ...[
-                                    Text(
-                                      'Files: ${event.files.join(', ')}',
-                                    ),
+                                    Text('Files: ${event.files.join(', ')}'),
                                     const SizedBox(height: 6),
                                   ],
                                   if (event.url != null) ...[
@@ -120,7 +115,9 @@ class HomeScreen extends StatelessWidget {
                                         ),
                                         TextButton(
                                           onPressed: () {
-                                            final uri = Uri.tryParse(event.url!);
+                                            final uri = Uri.tryParse(
+                                              event.url!,
+                                            );
                                             if (uri != null) {
                                               launchUrl(uri);
                                             }

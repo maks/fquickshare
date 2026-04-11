@@ -13,13 +13,11 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: state,
-        child: const MaterialApp(
-          home: HomeScreen(),
-        ),
+        child: const MaterialApp(home: HomeScreen()),
       ),
     );
 
-    expect(find.text('RQuickShare'), findsOneWidget);
+    expect(find.text('FQuickShare'), findsOneWidget);
     expect(find.text('Service: Not running'), findsOneWidget);
     expect(find.text('Auto-accept'), findsOneWidget);
     expect(find.text('Waiting for transfers...'), findsOneWidget);
